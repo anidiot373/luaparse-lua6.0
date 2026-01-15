@@ -260,10 +260,19 @@
       };
     }
 
-		, deferStatement: function(value) {
+		, deferStatement: function(argument) {
 			return {
 					type: 'DeferStatement'
-				, argument: value
+				, argument: argument
+			};
+		}
+
+		, usingStatement: function(variables, inits, body) {
+			return {
+					type: 'UsingStatement'
+				, variables: variables
+				, inits: inits
+				, body: body
 			};
 		}
 
@@ -428,6 +437,19 @@
       };
     }
 
+		, tablePattern: function(fields) {
+			return {
+					type: 'TablePattern'
+				, fields: fields
+			}
+		}
+		
+		, restElement: function(name) {
+			return {
+					type: 'RestElement'
+				, name: name
+			}
+		}
 
     , tableConstructorExpression: function(fields) {
       return {
@@ -1502,7 +1524,7 @@
           return ('goto' === id);
         return false;
       case 5:
-        return 'break' === id || 'local' === id || 'until' === id || 'while' === id || 'defer' === id;
+        return 'break' === id || 'local' === id || 'until' === id || 'while' === id || 'defer' === id || 'using' === id;
       case 6:
         return 'elseif' === id || 'repeat' === id || 'return' === id;
       case 8:
@@ -1892,6 +1914,7 @@
         case 'while':    next(); return parseWhileStatement(flowContext);
         case 'for':      next(); return parseForStatement(flowContext);
         case 'repeat':   next(); return parseRepeatStatement(flowContext);
+				case 'using':    next(); return parseUsingStatement(flowContext);
         case 'break':    next();
           if (!features.breakAnywhere && !flowContext.isInLoop())
             raise(token, errors.noLoopToBreak, token.value);
@@ -2027,6 +2050,38 @@
 
     return finishNode(ast.deferStatement(expression));
   }
+
+	//     usestat ::= 'using' Name {',' Name} '=' exp {',' exp} 'do' block 'end'
+	function parseUsingStatement(flowContext) {
+		var variables = [parseIdentifier()];
+		if ('=' !== token.value) {
+			while (consume(',')) {
+				let variable = parseIdentifier();
+				variables.push(variable)
+			}
+		}
+
+		expect('=');
+
+		var expressions = [parseExpression(flowContext)];
+		if ('do' !== token.value) {
+			while (consume(',')) {
+				let expression = parseExpectedExpression(flowContext);
+				expressions.push(expression);
+			}
+    }
+
+		expect('do');
+
+    if (options.scope) createScope();
+    flowContext.pushScope();
+		var body = parseBlock(flowContext);
+    flowContext.popScope();
+    if (options.scope) destroyScope();
+
+		expect('end');
+		return ast.usingStatement(variables, expressions, body);
+	}
 
   //     if ::= 'if' exp 'then' block {elif} ['else' block] 'end'
   //     elif ::= 'elseif' exp 'then' block
@@ -2166,12 +2221,16 @@
     var name
       , declToken = previousToken;
 
-    if (Identifier === token.type) {
+    if (Identifier === token.type || '{' === token.value) {
       var variables = []
         , init = [];
 
       do {
-        name = parseIdentifier();
+				if ('{' === token.value) {
+					name = parseTablePattern();
+				} else {
+        	name = parseIdentifier();
+				}
 
         variables.push(name);
         flowContext.addLocal(name.name, declToken);
@@ -2211,8 +2270,35 @@
     }
   }
 
+	//     tblptrn ::= '{' ptrnfield {',' ptrnfield} '}'
+  //
+	//     ptrnfield ::= Name
+  //                 | '...' Name
+	function parseTablePattern() {
+		expect('{');
+
+		var fields = [];
+
+		do {
+			if (Identifier !== token.type)
+				if ('...' === token.value) {
+					next();
+					if (Identifier !== token.type)
+						unexpected(token);
+					fields.push(ast.restElement(parseIdentifier()));
+				} else
+					unexpected(token);
+			else
+				fields.push(parseIdentifier());
+		} while (consume(','));
+
+		expect('}');
+
+		return finishNode(ast.tablePattern(fields))
+	}
+
   //     assignment ::= varlist '=' explist
-  //     var ::= Name | prefixexp '[' exp ']' | prefixexp '.' Name
+  //     var ::= Name | tblptrn | prefixexp '[' exp ']' | prefixexp '.' Name
   //     varlist ::= var {',' var}
   //     explist ::= exp {',' exp}
   //
@@ -2244,6 +2330,9 @@
         base = parseExpectedExpression(flowContext);
         expect(')');
         lvalue = false;
+			} else if ('{' === token.value) {
+				base = parseTablePattern();
+				lvalue = true;
       } else {
         return unexpected(token);
       }
@@ -2254,11 +2343,11 @@
         switch (StringLiteral === token.type ? '"' : token.value) {
         case '.':
         case '[':
+        case '{':
           lvalue = true;
           break;
         case ':':
         case '(':
-        case '{':
         case '"':
           lvalue = null;
           break;
