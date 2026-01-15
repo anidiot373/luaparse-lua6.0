@@ -1119,6 +1119,222 @@
         ]
       }
     },
+	{
+      "source": "a += 1; b *= 2.5 / 7",
+      "result": {
+        "type": "Chunk",
+        "body": [
+          {
+            "type": "CompoundAssignmentStatement",
+            "variables": [
+              {
+                "type": "Identifier",
+                "name": "a",
+                "loc": {
+                  "start": {
+                    "line": 1,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 1
+                  }
+                },
+                "range": [
+                  0,
+                  1
+                ],
+                "isLocal": false
+              }
+            ],
+			"operation": "+=",
+            "init": [
+              {
+				"type": "NumericLiteral",
+				"value": 6,
+				"raw": "6",
+				"loc": {
+					"start": {
+						"line": 1,
+						"column": 5
+					},
+					"end": {
+						"line": 1,
+						"column": 6
+					}
+				}
+			  }
+            ],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+              "end": {
+                "line": 1,
+                "column": 25
+              }
+            },
+            "range": [
+              0,
+              25
+            ]
+          },
+		  {
+            "type": "CompoundAssignmentStatement",
+            "variables": [
+              {
+                "type": "Identifier",
+                "name": "b",
+                "loc": {
+                  "start": {
+                    "line": 1,
+                    "column": 8
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 9
+                  }
+                },
+                "range": [
+                  8,
+                  9
+                ],
+                "isLocal": false
+              }
+            ],
+			"operation": "*=",
+            "init": [
+              {
+				"type": "BinaryExpression",
+				"left": {
+					"type": "NumericLiteral",
+					"value": 2.5,
+					"raw": "2.5",
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 13
+						},
+						"end": {
+							"line": 1,
+							"column": 16
+						}
+					},
+					"range": [
+						13,
+						16
+					]
+				},
+				"operation": "/",
+				"right": {
+					"type": "NumericLiteral",
+					"value": 7,
+					"raw": "7",
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 19
+						},
+						"end": {
+							"line": 1,
+							"column": 20
+						}
+					},
+					"range": [
+						19,
+						20
+					]
+				},
+				"loc": {
+					"start": {
+						"line": 1,
+						"column": 5
+					},
+					"end": {
+						"line": 1,
+						"column": 20
+					}
+				},
+				"range": [
+					5,
+					20
+				]
+			  }
+            ],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 8
+              },
+              "end": {
+                "line": 1,
+                "column": 20
+              }
+            },
+            "range": [
+              8,
+              20
+            ]
+          }
+        ],
+        "loc": {
+          "start": {
+            "line": 1,
+            "column": 0
+          },
+          "end": {
+            "line": 1,
+            "column": 25
+          }
+        },
+        "range": [
+          0,
+          25
+        ],
+        "comments": [],
+        "globals": [
+          {
+            "type": "Identifier",
+            "name": "a",
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+              "end": {
+                "line": 1,
+                "column": 1
+              }
+            },
+            "range": [
+              0,
+              1
+            ],
+            "isLocal": false
+          },
+		  {
+            "type": "Identifier",
+            "name": "b",
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 8
+              },
+              "end": {
+                "line": 1,
+                "column": 9
+              }
+            },
+            "range": [
+              8,
+              9
+            ],
+            "isLocal": false
+          }
+        ]
+      }
+    },
     {
       "source": "a = ((1",
       "result": "[1:7] ')' expected near '<eof>'"

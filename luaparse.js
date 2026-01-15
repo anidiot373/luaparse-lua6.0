@@ -319,6 +319,15 @@
       };
     }
 
+	, compoundAssignmentStatement: function(variables, operator, init) {
+      return {
+          type: 'CompoundAssignmentStatement'
+        , variables: variables
+		, operator: operator
+        , init: init
+      };
+    }
+
     , callStatement: function(expression) {
       return {
           type: 'CallStatement'
@@ -736,6 +745,9 @@
         if (isDecDigit(next)) return scanNumericLiteral();
         if (46 === next) {
           if (46 === input.charCodeAt(index + 2)) return scanVarargLiteral();
+					if (features.compoundAssignments)
+						if (61 === input.charCodeAt(index + 2)) return scanPunctuator('..=');
+
           return scanPunctuator('..');
         }
         return scanPunctuator('.');
@@ -746,13 +758,23 @@
 
       case 62: // >
         if (features.bitwiseOperators)
-          if (62 === next) return scanPunctuator('>>');
+          if (62 === next)
+						if (features.compoundAssignments) {
+							if (61 === input.charCodeAt(index + 2)) return scanPunctuator('>>=');
+
+							return scanPunctuator('>>');
+						}
         if (61 === next) return scanPunctuator('>=');
         return scanPunctuator('>');
 
       case 60: // <
         if (features.bitwiseOperators)
-          if (60 === next) return scanPunctuator('<<');
+          if (60 === next)
+						if (features.compoundAssignments) {
+							if (61 === input.charCodeAt(index + 2)) return scanPunctuator('<<=');
+							
+							return scanPunctuator('<<');
+						}
         if (61 === next) return scanPunctuator('<=');
         return scanPunctuator('<');
 
@@ -774,6 +796,8 @@
 
       case 47: // /
         // Check for integer division op (//)
+				if (features.compoundAssignments)
+					if (next === 61) return scanPunctuator(input.charAt(index) + "=");
         if (features.integerDivision)
           if (47 === next) return scanPunctuator('//');
         return scanPunctuator('/');
@@ -783,9 +807,15 @@
           break;
 
         /* fall through */
-      case 42: case 94: case 37: case 44: case 123: case 125:
-      case 93: case 40: case 41: case 59: case 35: case 45:
-      case 43: // * ^ % , { } ] ( ) ; # - +
+			case 42: case 94: case 37: case 45: case 43: // * ^ % - +
+				if (features.compoundAssignments)
+					if (next === 61) return scanPunctuator(input.charAt(index) + "=");
+
+				return scanPunctuator(input.charAt(index));
+
+    	case 44: case 123: case 125:
+      case 93: case 40: case 41: case 59:
+      case 35: // , { } ] ( ) ; #
         return scanPunctuator(input.charAt(index));
     }
 
@@ -966,11 +996,26 @@
       readHexLiteral() : readDecLiteral();
 
     var foundImaginaryUnit = readImaginaryUnitSuffix()
-      , foundInt64Suffix = readInt64Suffix();
+      , foundInt64Suffix = readInt64Suffix()
+			, foundJsSuffix = readJavaScriptIntSuffix();
 
     if (foundInt64Suffix && (foundImaginaryUnit || literal.hasFractionPart)) {
       raise(null, errors.malformedNumber, input.slice(tokenStart, index));
     }
+
+		if (foundJsSuffix === "BG" && (foundImaginaryUnit || literal.hasFractionPart)) {
+			raise(null, errors.malformedNumber, input.slice(tokenStart, index));
+		}
+
+		if (foundJsSuffix === "BG") {
+			return {
+				type: NumericLiteral
+			, value: BigInt(input.slice(tokenStart, index - 2))
+			, line: line
+			, lineStart: lineStart
+			, range: [tokenStart, index]
+			}
+		}
 
     return {
         type: NumericLiteral
@@ -993,6 +1038,25 @@
       return false;
     }
   }
+
+	function readJavaScriptIntSuffix() {
+		if (!features.javaScriptIntegerSuffixes) return;
+
+		if ('bB'.indexOf(input.charAt(index) || null) >= 0) {
+			++index;
+			if ('gG'.indexOf(input.charAt(index) || null) >= 0) {
+				++index;
+				return "BG";
+			}
+			else {
+				raise(null, errors.malformedNumber, input.slice(tokenStart, index));
+			}
+		}
+		else if ('gG'.indexOf(input.charAt(index) || null) >= 0) {
+			++index;
+			raise(null, errors.malformedNumber, input.slice(tokenStart, index));
+		}
+	}
 
   function readInt64Suffix() {
     if (!features.integerSuffixes) return;
@@ -2190,7 +2254,23 @@
       return unexpected(token);
     }
 
-    expect('=');
+		if (['+=', '-=', '*=', '^=', '/=', '%=', '..=', '&=', '|=', '<<=', '>>='].includes(token.value)) {
+			const operator = token.value;
+
+			next();
+
+			var values = [];
+
+			do {
+				values.push(parseExpectedExpression(flowContext));
+			} while (consume(','));
+
+			pushLocation(startMarker);
+			return finishNode(ast.compoundAssignmentStatement(targets, operator, values));
+		}
+		else {
+    	expect('=');
+		}
 
     var values = [];
 
@@ -2653,6 +2733,21 @@
       integerDivision: true,
       relaxedBreak: true
     },
+		'6.0': {
+      integerDivision: true,
+      relaxedBreak: true,
+      bitwiseOperators: true,
+			labels: true,
+      emptyStatement: true,
+			contextualGoto: true,
+			hexEscapes: true,
+			skipWhitespaceEscape: true,
+			strictEscapes: true,
+			unicodeEscapes: true,
+			imaginaryNumbers: true,
+			compoundAssignments: true,
+			javaScriptIntegerSuffixes: true
+		},
     'LuaJIT': {
       // XXX: LuaJIT language features may depend on compilation options; may need to
       // rethink how to handle this. Specifically, there is a LUAJIT_ENABLE_LUA52COMPAT
