@@ -1,6 +1,6 @@
 {
   "name": "luaparse-lua6.0",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A fork of luaparse that supports Lua 6.0.",
   "keywords": [
     "ast",
@@ -15,8 +15,8 @@
     "LICENSE",
     "luaparse.js"
   ],
-	"scripts": {
-		"test": "node test/test.js"
-	},
+  "scripts": {
+    "test": "node test/test.js"
+  },
   "main": "luaparse.js"
 }
