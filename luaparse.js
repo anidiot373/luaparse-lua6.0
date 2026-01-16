@@ -2343,11 +2343,11 @@
         switch (StringLiteral === token.type ? '"' : token.value) {
         case '.':
         case '[':
-        case '{':
           lvalue = true;
           break;
         case ':':
         case '(':
+        case '{':
         case '"':
           lvalue = null;
           break;
