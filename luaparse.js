@@ -2311,6 +2311,8 @@
 	//     ptrnfield ::= Name
   //                 | '...' Name
 	function parseTablePattern() {
+    markLocation();
+		
 		if (token.value !== '[' && token.value !== '{') {
 			unexpected(token);
 		}
