@@ -440,9 +440,10 @@
       };
     }
 
-		, tablePattern: function(fields) {
+		, tablePattern: function(isArray, fields) {
 			return {
 					type: 'TablePattern'
+				, isArray: isArray
 				, fields: fields
 			}
 		}
@@ -520,6 +521,13 @@
         , argument: argument
       };
     }
+
+		, argumentSpreadExpression: function(argument) {
+			return {
+					type: "ArgumentSpreadExpression"
+				, argument: argument
+			}
+		}
 
     , comment: function(value, raw) {
       return {
@@ -1959,6 +1967,14 @@
     return parseAssignmentOrCallStatement(flowContext);
   }
 
+	function parseLocalAssignment(flowContext) {
+		if (options.luaVersion !== '6.0')
+			return parseIdentifier();
+		if ('[' === token.value || '{' === token.value)
+			return parseTablePattern();
+		return parseIdentifier();
+	}
+
   // ## Statements
 
   //     label ::= '::' Name '::'
@@ -2076,10 +2092,10 @@
 
 	//     usestat ::= 'using' Name {',' Name} '=' exp {',' exp} 'do' block 'end'
 	function parseUsingStatement(flowContext) {
-		var variables = [parseIdentifier()];
+		var variables = [parseLocalAssignment()];
 		if ('=' !== token.value) {
 			while (consume(',')) {
-				let variable = parseIdentifier();
+				let variable = parseLocalAssignment();
 				variables.push(variable)
 			}
 		}
@@ -2170,8 +2186,8 @@
   //     explist ::= exp {',' exp}
 
   function parseForStatement(flowContext) {
-    var variable = parseIdentifier()
-      , body;
+    var variable = parseLocalAssignment()
+		, body;
 
     // The start-identifier is local.
 
@@ -2205,7 +2221,8 @@
       // The namelist can contain one or more identifiers.
       var variables = [variable];
       while (consume(',')) {
-        variable = parseIdentifier();
+				variable = parseLocalAssignment();
+
         // Each variable in the namelist is locally scoped.
         if (options.scope) scopeIdentifier(variable);
         variables.push(variable);
@@ -2244,16 +2261,12 @@
     var name
       , declToken = previousToken;
 
-    if (Identifier === token.type || '{' === token.value) {
+    if (Identifier === token.type || '{' === token.value || '[' === token.value) {
       var variables = []
         , init = [];
 
       do {
-				if ('{' === token.value) {
-					name = parseTablePattern();
-				} else {
-        	name = parseIdentifier();
-				}
+				name = parseLocalAssignment();
 
         variables.push(name);
         flowContext.addLocal(name.name, declToken);
@@ -2298,7 +2311,12 @@
 	//     ptrnfield ::= Name
   //                 | '...' Name
 	function parseTablePattern() {
-		expect('{');
+		if (token.value !== '[' && token.value !== '{') {
+			unexpected(token);
+		}
+		const starter = token.value;
+
+		next();
 
 		var fields = [];
 
@@ -2315,9 +2333,9 @@
 				fields.push(parseIdentifier());
 		} while (consume(','));
 
-		expect('}');
+		expect(starter === '[' ? ']' : '}');
 
-		return finishNode(ast.tablePattern(fields))
+		return finishNode(ast.tablePattern(starter === '[', fields));
 	}
 
   //     assignment ::= varlist '=' explist
@@ -2353,7 +2371,7 @@
         base = parseExpectedExpression(flowContext);
         expect(')');
         lvalue = false;
-			} else if ('{' === token.value) {
+			} else if ('[' === token.value || '{' === token.value) {
 				base = parseTablePattern();
 				lvalue = true;
       } else {
@@ -2776,12 +2794,25 @@
 
           // List of expressions
           var expressions = [];
-          var expression = parseExpression(flowContext);
+          var expression
+					
+					if (consume('...')) {
+						expression = ast.argumentSpreadExpression(parseExpectedExpression(flowContext));
+					}
+					else {
+						expression = parseExpression(flowContext);
+					}
           if (null != expression) {
             expressions.push(expression);
             while (consume(',')) {
-              expression = parseExpectedExpression(flowContext);
-              expressions.push(expression);
+							if (consume('...')) {
+								expression = parseExpectedExpression(flowContext);
+								expressions.push(ast.argumentSpreadExpression(expression));
+							}
+							else {
+								expression = parseExpectedExpression(flowContext);
+								expressions.push(expression);
+							}
             }
           }
 
